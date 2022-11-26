@@ -4,125 +4,23 @@
 # (C) 2022 Alex "Lexi" Mayfield
 #
 
-from dataclasses import dataclass
-from enum import Enum
-from pathlib import Path
-from typing import Optional
-import os
 import platform
-import shutil
-import subprocess
+
+from buildlib import *
+from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).parent
 CMAKE_PREFIX_PATH = SCRIPT_DIR / "local"
 
 
-class CompileFlag(Enum):
-    MSVC = 1
-
-
-@dataclass
-class CompileEnv:
-    generator: str
-    flags: set[CompileFlag]
-
-
-ENVIRONMENT: Optional[CompileEnv] = None
-
-
-def environment():
-    global ENVIRONMENT
-
-    if not ENVIRONMENT is None:
-        return ENVIRONMENT
-
-    ENVIRONMENT = CompileEnv("Visual Studio 17 2022", {CompileFlag.MSVC})
-    return ENVIRONMENT
-
-
-CMAKE_COMMAND: Optional[Path] = None
-
-
-def cmake_command():
-    global CMAKE_COMMAND
-
-    if not CMAKE_COMMAND is None:
-        return CMAKE_COMMAND
-
-    path = shutil.which("cmake")
-    if path is None:
-        raise Exception("Could not find cmake installation")
-
-    CMAKE_COMMAND = Path(path)
-    return CMAKE_COMMAND
-
-
-def libname_static(lib: str):
-    if platform.system() == "Windows":
-        return f"{lib}.lib"
-    else:
-        return f"lib{lib}.a"
-
-
-def lib_buildgen(
-    srcdir: Path,
-    builddir: Path,
-    defines: dict[str, str] = {},
-    cxxflags: Optional[list[str]] = None,
-):
-    args = [
-        cmake_command(),
-        "-G",
-        environment().generator,
-        "-S",
-        srcdir,
-        "-B",
-        builddir,
-        f"-DCMAKE_PREFIX_PATH={CMAKE_PREFIX_PATH}",
-        f"-DCMAKE_INSTALL_PREFIX={CMAKE_PREFIX_PATH}",
-    ]
-    for key, val in defines.items():
-        args.append(f"-D{key}={val}")
-
-    env = os.environ.copy()
-    if not cxxflags is None:
-        env["CXXFLAGS"] = " ".join(cxxflags)
-
-    subprocess.run(args, env=env)
-
-
-def lib_build(
-    builddir: Path, config: Optional[str] = None, target: Optional[str] = None
-):
-    args = [cmake_command(), "--build", builddir]
-    if not config is None:
-        args.extend(["--config", config])
-    if not target is None:
-        args.extend(["--target", target])
-    subprocess.run(args)
-
-
-def build(
-    libname: str,
-    defines: dict[str, str] = {},
-    cxxflags: Optional[list[str]] = None,
-    srcdir: Optional[Path] = None,
-):
-    if srcdir is None:
-        srcdir = SCRIPT_DIR / "libraries" / libname
-    builddir = SCRIPT_DIR / "build" / libname
-
-    lib_buildgen(srcdir=srcdir, builddir=builddir, defines=defines, cxxflags=cxxflags)
-    lib_build(builddir=builddir, config="Debug", target="install")
-    lib_build(builddir=builddir, config="RelWithDebInfo", target="install")
-
-
 def build_zlib():
-    build("zlib")
+    git_submodule("libraries/zlib")
+    cmake_build("zlib")
 
 
 def build_libpng():
-    build("libpng", defines={"PNG_SHARED": "OFF", "PNG_TESTS": "OFF"})
+    git_submodule("libraries/libpng")
+    cmake_build("libpng", defines={"PNG_SHARED": "OFF", "PNG_TESTS": "OFF"})
 
 
 def build_curl():
@@ -133,9 +31,12 @@ def build_curl():
         "CURL_ZLIB": "OFF",
         "HTTP_ONLY": "ON",
     }
+
     if platform.system() == "Windows":
         defines["CMAKE_USE_WINSSL"] = "ON"
-    build("curl", defines=defines)
+
+    git_submodule("libraries/curl")
+    cmake_build("curl", defines=defines)
 
 
 def build_fltk():
@@ -155,7 +56,8 @@ def build_fltk():
         defines["PNG_PNG_INCLUDE_DIR"] = CMAKE_PREFIX_PATH / "include" / "libpng16"
         defines["HAVE_PNG_H"] = "ON"
 
-    build("fltk", defines=defines)
+    git_submodule("libraries/fltk")
+    cmake_build("fltk", lang="cxx", defines=defines)
 
 
 def build_jsoncpp():
@@ -169,7 +71,8 @@ def build_jsoncpp():
         "CCACHE_EXECUTABLE": "CCACHE_EXECUTABLE-NOTFOUND",
     }
 
-    build("jsoncpp", defines=defines)
+    git_submodule("libraries/jsoncpp")
+    cmake_build("jsoncpp", lang="cxx", defines=defines)
 
 
 def build_miniupnpc():
@@ -179,7 +82,8 @@ def build_miniupnpc():
         "UPNPC_BUILD_SAMPLE": "OFF",
     }
 
-    build(
+    git_submodule("libraries/miniupnp")
+    cmake_build(
         "miniupnpc",
         defines=defines,
         srcdir=SCRIPT_DIR / "libraries" / "miniupnp" / "miniupnpc",
@@ -198,11 +102,47 @@ def build_protobuf():
         # https://developercommunity.visualstudio.com/t/Visual-Studio-1740-no-longer-compiles-/10193665
         cxxflags = ["/D_SILENCE_STDEXT_HASH_DEPRECATION_WARNINGS"]
 
-    build(
+    git_submodule("libraries/protobuf")
+    cmake_build(
         "protobuf",
+        lang="cxx",
         defines=defines,
         cxxflags=cxxflags,
         srcdir=SCRIPT_DIR / "libraries" / "protobuf" / "cmake",
+    )
+
+
+def build_sdl():
+    git_submodule("libraries/SDL")
+    cmake_build("SDL")
+
+
+def build_sdl_mixer():
+    git_submodule("libraries/SDL_mixer")
+    git_submodule("external/flac", "libraries/SDL_mixer")
+    git_submodule("external/libmodplug", "libraries/SDL_mixer")
+    git_submodule("external/ogg", "libraries/SDL_mixer")
+    git_submodule("external/opus", "libraries/SDL_mixer")
+    git_submodule("external/opusfile", "libraries/SDL_mixer")
+    cmake_build("SDL_mixer", defines={"SDL2MIXER_SAMPLES": "OFF"})
+
+
+def build_wxwidgets():
+    git_submodule("libraries/wxWidgets")
+    cmake_build(
+        "wxWidgets",
+        lang="cxx",
+        config="Release",
+        defines={
+            "wxBUILD_COMPATIBILITY": "3.0",
+            "wxUSE_REGEX": "OFF",
+            "wxUSE_ZLIB": "OFF",
+            "wxUSE_EXPAT": "OFF",
+            "wxUSE_LIBJPEG": "OFF",
+            "wxUSE_LIBPNG": "OFF",
+            "wxUSE_LIBTIFF": "OFF",
+            "wxUSE_NANOSVG": "OFF",
+        },
     )
 
 
@@ -213,3 +153,6 @@ build_fltk()
 build_jsoncpp()
 build_miniupnpc()
 build_protobuf()
+build_sdl()
+build_sdl_mixer()
+build_wxwidgets()

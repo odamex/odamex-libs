@@ -21,3 +21,12 @@
 	path = libraries/zlib
 	url = https://github.com/madler/zlib.git
 	ignore = dirty
+[submodule "libraries/SDL"]
+	path = libraries/SDL
+	url = https://github.com/libsdl-org/SDL.git
+[submodule "libraries/SDL_mixer"]
+	path = libraries/SDL_mixer
+	url = https://github.com/libsdl-org/SDL_mixer.git
+[submodule "libraries/wxWidgets"]
+	path = libraries/wxWidgets
+	url = https://github.com/wxWidgets/wxWidgets.git
