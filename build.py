@@ -129,19 +129,24 @@ def build_sdl_mixer():
 
 def build_wxwidgets():
     git_submodule("libraries/wxWidgets")
+    git_submodule("src/expat", "libraries/wxWidgets")
     cmake_build(
         "wxWidgets",
         lang="cxx",
         config="Release",
         defines={
             "wxBUILD_COMPATIBILITY": "3.0",
-            "wxUSE_REGEX": "OFF",
-            "wxUSE_ZLIB": "OFF",
-            "wxUSE_EXPAT": "OFF",
+            "wxBUILD_INSTALL": "ON",
+            "wxUSE_ARTPROVIDER_TANGO": "OFF",
+            "wxUSE_EXPAT": "builtin",
             "wxUSE_LIBJPEG": "OFF",
             "wxUSE_LIBPNG": "OFF",
             "wxUSE_LIBTIFF": "OFF",
             "wxUSE_NANOSVG": "OFF",
+            "wxUSE_REGEX": "OFF",
+            "wxUSE_SVG": "OFF",
+            "wxUSE_XRC": "ON",
+            "wxUSE_ZLIB": "OFF",
         },
     )
 
